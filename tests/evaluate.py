@@ -31,6 +31,7 @@ def evaluate() -> None:
             citations,
             retrieved_sources,
             reranked_sources,
+            confidence,
         ) = ask(
             question=test_case["question"],
             history=[],
@@ -75,6 +76,7 @@ def evaluate() -> None:
             "reranked_sources": reranked_sources,
             "final_sources": final_sources,
             "citations": citations,
+            "confidence": confidence,
         }
 
         results.append(result)
@@ -99,6 +101,11 @@ def evaluate() -> None:
         print(f"Answer: {'PASSOU' if answer_ok else 'FALHOU'}")
         print(f"Sources: {'PASSOU' if sources_ok else 'FALHOU'}")
         print(f"Overall: {'PASSOU' if overall_passed else 'FALHOU'}")
+        print(
+            f"Confidence: {confidence['level']} "
+            f"({confidence['score']}) - "
+            f"{confidence['reason']}"
+        )
 
         if not overall_passed:
             print("\nDEBUG FALHA:")

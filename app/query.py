@@ -19,6 +19,8 @@ from app.reranker import rerank
 from app.retrieval.hybrid_search import hybrid_ranking
 from app.retrieval.parent_child import expand_with_neighbors
 from app.vectorstore.chroma_store import search_chunks
+from app.confidence import calculate_confidence
+
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -140,6 +142,11 @@ Pergunta:
 
     selected_distances = [distance for document, metadata, distance in selected_chunks]
 
+    confidence = calculate_confidence(
+        sources=sources,
+        distances=selected_distances,
+    )
+
     return (
         response.output_text,
         sources,
@@ -148,6 +155,7 @@ Pergunta:
         citations,
         retrieved_sources,
         reranked_sources,
+        confidence,
     )
 
 
@@ -168,10 +176,14 @@ if __name__ == "__main__":
             citations,
             retrieved_sources,
             reranked_sources,
+            confidence,
         ) = ask(
             question=question,
             history=history,
         )
+
+        print("\nConfiança:")
+        print(f"{confidence['level']} ({confidence['score']}) - {confidence['reason']}")
 
         print(f"\nPergunta reescrita:\n{rewritten_question}")
 
