@@ -71,8 +71,8 @@ dist/
 # =========================
 # Local data files
 # =========================
-data/raw/*
-!data/raw/.gitkeep
+#data/raw/*
+#!data/raw/.gitkeep
 
 # =========================
 # Secrets
