@@ -17,12 +17,24 @@ from app.metadata_filter import detect_metadata_filter
 from app.question_rewriter import rewrite_question
 from app.reranker import rerank
 from app.retrieval.hybrid_search import hybrid_ranking
-from app.retrieval.parent_child import expand_with_neighbors
+from app.retrieval.parent_retrieval import expand_with_parent
 from app.vectorstore.chroma_store import search_chunks
 from app.confidence import calculate_confidence
 
 
 client = OpenAI(api_key=OPENAI_API_KEY)
+
+
+def get_collection_from_filter(
+    metadata_filter: dict | None,
+) -> str:
+    if not metadata_filter:
+        return "documents"
+
+    if metadata_filter.get("document_type") == "image":
+        return "images"
+
+    return "documents"
 
 
 def ask(
@@ -41,10 +53,22 @@ def ask(
 
     query_embedding = create_embedding(rewritten_question)
 
+    def get_collection_from_filter(metadata_filter: dict | None) -> str:
+        if not metadata_filter:
+            return "documents"
+
+        if metadata_filter.get("document_type") == "image":
+            return "images"
+
+        return "documents"
+
+    collection_name = get_collection_from_filter(metadata_filter)
+
     results = search_chunks(
         query_embedding=query_embedding,
         n_results=RETRIEVAL_RESULTS,
         where=metadata_filter,
+        collection_name=collection_name,
     )
 
     if metadata_filter:
@@ -73,6 +97,12 @@ def ask(
     )
 
     if not candidates:
+        confidence = {
+            "level": "low",
+            "score": 0.0,
+            "reason": "Nenhum candidato encontrado.",
+        }
+
         return (
             "Não encontrei essa informação nos documentos.",
             [],
@@ -81,6 +111,7 @@ def ask(
             [],
             retrieved_sources,
             [],
+            confidence,
         )
 
     candidate_documents = [document for document, metadata, distance in candidates]
@@ -92,9 +123,14 @@ def ask(
     )
 
     selected_chunks = [candidates[index] for index in selected_indexes]
-    selected_chunks = expand_with_neighbors(
+
+    print("\nDEBUG PARENT IDS:")
+    for _, metadata, _ in selected_chunks:
+        print(metadata)
+
+    selected_chunks = expand_with_parent(
         selected_chunks=selected_chunks,
-        window=1,
+        collection_name=collection_name,
     )
 
     reranked_sources = list({metadata["source"] for _, metadata, _ in selected_chunks})

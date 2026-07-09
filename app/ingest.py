@@ -9,6 +9,8 @@ from app.loaders.docx_loader import load_docx
 from app.loaders.image_loader import load_image
 from app.loaders.pdf_loader import load_pdf
 from app.vectorstore.chroma_store import add_chunks, source_exists
+from app.config import DATA_PATH
+from app.config import DATA_PATH, PARENT_CHUNK_SIZE
 
 
 def get_document_type(file_path: Path) -> str:
@@ -39,7 +41,9 @@ def load_file(file_path: Path) -> str:
 
 
 def ingest_file(file_path: Path) -> None:
-    if source_exists(file_path.name):
+    collection_name = get_collection_name(file_path)
+
+    if source_exists(file_path.name, collection_name=collection_name):
         print(f"{file_path.name}: já indexado, pulando")
         return
 
@@ -58,7 +62,10 @@ def ingest_file(file_path: Path) -> None:
             "file_type": file_path.suffix.lower(),
             "document_type": get_document_type(file_path),
             "chunk_index": index,
+            "parent_id": get_parent_id(file_path.name, index),
+            "parent_index": index // PARENT_CHUNK_SIZE,
             "indexed_at": indexed_at,
+            "collection_name": collection_name,
         }
         for index, _ in enumerate(chunks)
     ]
@@ -68,9 +75,25 @@ def ingest_file(file_path: Path) -> None:
         chunks=chunks,
         embeddings=embeddings,
         metadatas=metadatas,
+        collection_name=collection_name,
     )
 
     print(f"{file_path.name}: {len(chunks)} chunks indexados")
+
+
+def get_parent_id(file_name: str, chunk_index: int) -> str:
+    parent_index = chunk_index // PARENT_CHUNK_SIZE
+
+    return f"{file_name}::parent_{parent_index}"
+
+
+def get_collection_name(file_path: Path) -> str:
+    document_type = get_document_type(file_path)
+
+    if document_type == "image":
+        return "images"
+
+    return "documents"
 
 
 if __name__ == "__main__":
