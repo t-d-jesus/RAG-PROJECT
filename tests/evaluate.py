@@ -32,6 +32,7 @@ def evaluate() -> None:
             retrieved_sources,
             reranked_sources,
             confidence,
+            metrics,
         ) = ask(
             question=test_case["question"],
             history=[],
@@ -77,6 +78,7 @@ def evaluate() -> None:
             "final_sources": final_sources,
             "citations": citations,
             "confidence": confidence,
+            "metrics": metrics,
         }
 
         results.append(result)

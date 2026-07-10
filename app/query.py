@@ -1,5 +1,8 @@
+import time
+
 from openai import OpenAI
 
+from app.confidence import calculate_confidence
 from app.config import (
     CHAT_MODEL,
     ENABLE_DISTANCE_FILTER,
@@ -14,69 +17,81 @@ from app.config import (
 from app.context_builder import build_context
 from app.embeddings.openai_embeddings import create_embedding
 from app.metadata_filter import detect_metadata_filter
+from app.observability import timer
 from app.question_rewriter import rewrite_question
 from app.reranker import rerank
 from app.retrieval.hybrid_search import hybrid_ranking
 from app.retrieval.parent_retrieval import expand_with_parent
 from app.vectorstore.chroma_store import search_chunks
-from app.confidence import calculate_confidence
 
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 
-def get_collection_from_filter(
+def get_collections_from_filter(
     metadata_filter: dict | None,
-) -> str:
+) -> list[str]:
     if not metadata_filter:
-        return "documents"
+        return ["documents", "images"]
 
     if metadata_filter.get("document_type") == "image":
-        return "images"
+        return ["images"]
 
-    return "documents"
+    return ["documents"]
 
 
 def ask(
     question: str,
     history: list[dict],
     metadata_filter: dict | None = None,
-) -> tuple[str, list[dict], list[float], str, list[dict], list[str], list[str]]:
+) -> tuple[
+    str,
+    list[dict],
+    list[float],
+    str,
+    list[dict],
+    list[str],
+    list[str],
+    dict,
+    dict,
+]:
+    pipeline_metrics = {}
+    total_start = time.perf_counter()
 
     if metadata_filter is None:
         metadata_filter = detect_metadata_filter(question)
 
-    rewritten_question = rewrite_question(
-        question=question,
-        conversation_history=history,
-    )
+    with timer(pipeline_metrics, "question_rewrite_time"):
+        rewritten_question = rewrite_question(
+            question=question,
+            conversation_history=history,
+        )
 
-    query_embedding = create_embedding(rewritten_question)
+    with timer(pipeline_metrics, "embedding_time"):
+        query_embedding = create_embedding(rewritten_question)
 
-    def get_collection_from_filter(metadata_filter: dict | None) -> str:
-        if not metadata_filter:
-            return "documents"
+    collection_names = get_collections_from_filter(metadata_filter)
 
-        if metadata_filter.get("document_type") == "image":
-            return "images"
+    documents = []
+    metadatas = []
+    distances = []
 
-        return "documents"
+    with timer(pipeline_metrics, "retrieval_time"):
+        for collection_name in collection_names:
+            results = search_chunks(
+                query_embedding=query_embedding,
+                n_results=RETRIEVAL_RESULTS,
+                where=metadata_filter,
+                collection_name=collection_name,
+            )
 
-    collection_name = get_collection_from_filter(metadata_filter)
-
-    results = search_chunks(
-        query_embedding=query_embedding,
-        n_results=RETRIEVAL_RESULTS,
-        where=metadata_filter,
-        collection_name=collection_name,
-    )
+            # Precisa ficar dentro do for.
+            documents.extend(results["documents"][0])
+            metadatas.extend(results["metadatas"][0])
+            distances.extend(results["distances"][0])
 
     if metadata_filter:
         print(f"\nFiltro aplicado: {metadata_filter}")
-
-    documents = results["documents"][0]
-    metadatas = results["metadatas"][0]
-    distances = results["distances"][0]
 
     retrieved_sources = list({metadata["source"] for metadata in metadatas})
 
@@ -91,10 +106,15 @@ def ask(
     else:
         candidates = all_candidates
 
-    candidates = hybrid_ranking(
-        question=rewritten_question,
-        candidates=candidates,
-    )
+    with timer(pipeline_metrics, "hybrid_ranking_time"):
+        candidates = hybrid_ranking(
+            question=rewritten_question,
+            candidates=candidates,
+        )
+
+    pipeline_metrics["collections"] = collection_names
+    pipeline_metrics["retrieved_chunks"] = len(all_candidates)
+    pipeline_metrics["filtered_candidates"] = len(candidates)
 
     if not candidates:
         confidence = {
@@ -102,6 +122,15 @@ def ask(
             "score": 0.0,
             "reason": "Nenhum candidato encontrado.",
         }
+
+        pipeline_metrics["reranked_chunks"] = 0
+        pipeline_metrics["expanded_chunks"] = 0
+        pipeline_metrics["context_chunks"] = 0
+        pipeline_metrics["context_chars"] = 0
+        pipeline_metrics["total_time"] = round(
+            time.perf_counter() - total_start,
+            6,
+        )
 
         return (
             "Não encontrei essa informação nos documentos.",
@@ -112,40 +141,49 @@ def ask(
             retrieved_sources,
             [],
             confidence,
+            pipeline_metrics,
         )
 
-    candidate_documents = [document for document, metadata, distance in candidates]
+    candidate_documents = [document for document, _, _ in candidates]
 
-    selected_indexes = rerank(
-        question=rewritten_question,
-        documents=candidate_documents,
-        top_k=RERANK_TOP_K,
-    )
+    with timer(pipeline_metrics, "rerank_time"):
+        selected_indexes = rerank(
+            question=rewritten_question,
+            documents=candidate_documents,
+            top_k=RERANK_TOP_K,
+        )
 
-    selected_chunks = [candidates[index] for index in selected_indexes]
+    reranked_chunks = [candidates[index] for index in selected_indexes]
 
-    print("\nDEBUG PARENT IDS:")
-    for _, metadata, _ in selected_chunks:
-        print(metadata)
+    # Fontes selecionadas diretamente pelo reranker.
+    reranked_sources = list({metadata["source"] for _, metadata, _ in reranked_chunks})
 
-    selected_chunks = expand_with_parent(
-        selected_chunks=selected_chunks,
-        collection_name=collection_name,
-    )
+    pipeline_metrics["reranked_chunks"] = len(reranked_chunks)
 
-    reranked_sources = list({metadata["source"] for _, metadata, _ in selected_chunks})
+    with timer(pipeline_metrics, "parent_retrieval_time"):
+        selected_chunks = expand_with_parent(
+            selected_chunks=reranked_chunks,
+        )
 
-    context, citations = build_context(
-        selected_chunks=selected_chunks,
-        max_chunks=MAX_CONTEXT_CHUNKS,
-        max_chars=MAX_CONTEXT_CHARS,
-    )
+    pipeline_metrics["expanded_chunks"] = len(selected_chunks)
+
+    with timer(pipeline_metrics, "context_build_time"):
+        context, citations = build_context(
+            selected_chunks=selected_chunks,
+            max_chunks=MAX_CONTEXT_CHUNKS,
+            max_chars=MAX_CONTEXT_CHARS,
+        )
+
+    # Citações representam os chunks realmente incluídos no contexto.
+    pipeline_metrics["context_chunks"] = len(citations)
+    pipeline_metrics["context_chars"] = len(context)
 
     print(f"\nContexto enviado: {len(context)} caracteres")
 
-    response = client.responses.create(
-        model=CHAT_MODEL,
-        input=f"""
+    with timer(pipeline_metrics, "llm_time"):
+        response = client.responses.create(
+            model=CHAT_MODEL,
+            input=f"""
 Você é um assistente de RAG.
 
 Regras:
@@ -164,7 +202,7 @@ Pergunta:
 
 {rewritten_question}
 """,
-    )
+        )
 
     sources = [
         {
@@ -173,14 +211,19 @@ Pergunta:
             "document_type": metadata.get("document_type"),
             "chunk_index": metadata.get("chunk_index"),
         }
-        for document, metadata, distance in selected_chunks
+        for _, metadata, _ in selected_chunks
     ]
 
-    selected_distances = [distance for document, metadata, distance in selected_chunks]
+    selected_distances = [distance for _, _, distance in selected_chunks]
 
     confidence = calculate_confidence(
         sources=sources,
         distances=selected_distances,
+    )
+
+    pipeline_metrics["total_time"] = round(
+        time.perf_counter() - total_start,
+        6,
     )
 
     return (
@@ -192,6 +235,7 @@ Pergunta:
         retrieved_sources,
         reranked_sources,
         confidence,
+        pipeline_metrics,
     )
 
 
@@ -213,6 +257,7 @@ if __name__ == "__main__":
             retrieved_sources,
             reranked_sources,
             confidence,
+            pipeline_metrics,
         ) = ask(
             question=question,
             history=history,
@@ -255,6 +300,21 @@ if __name__ == "__main__":
                 f"distance={citation['distance']:.4f})"
             )
 
-        history.append({"role": "user", "content": question})
-        history.append({"role": "assistant", "content": answer})
+        print("\nMétricas:")
+        for key, value in pipeline_metrics.items():
+            print(f"- {key}: {value}")
+
+        history.append(
+            {
+                "role": "user",
+                "content": question,
+            }
+        )
+        history.append(
+            {
+                "role": "assistant",
+                "content": answer,
+            }
+        )
+
         history = history[-MAX_HISTORY_MESSAGES:]
