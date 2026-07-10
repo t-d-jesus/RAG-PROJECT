@@ -70,7 +70,7 @@ TEST_CASES = [
         "id": "sydney_006",
         "category": "document",
         "question": "Para que este documento foi criado?",
-        "expected_keywords": ["projeto", "RAG"],
+        "expected_keywords": ["testar", "RAG"],
         "expected_sources": DOCUMENT_SOURCES,
         "expected_retrieval_sources": DOCUMENT_SOURCES,
         "expected_rerank_sources": DOCUMENT_SOURCES,
