@@ -1,5 +1,5 @@
-from app.vectorstore.chroma_store import reset_collection
+from app.vectorstore.chroma_store import reset_all_collections
 
-reset_collection()
+reset_all_collections()
 
-print("Chroma resetado com sucesso")
+print("Todas as collections do Chroma foram resetadas com sucesso")

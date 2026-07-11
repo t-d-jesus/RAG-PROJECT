@@ -242,3 +242,13 @@ rag-project/
 - Context Expansion
 - Conversational Memory
 - Evaluation Framework
+
+
+## Releases
+
+- v0.1.0 - Initial RAG
+- v0.2.0 - Parent Retrieval
+- v0.3.0 - Multi Collections
+- v0.4.0 - Observability
+- v0.5.0 - BM25 Hybrid Ranking
+

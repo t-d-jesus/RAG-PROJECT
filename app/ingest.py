@@ -8,9 +8,8 @@ from app.embeddings.openai_embeddings import create_embedding
 from app.loaders.docx_loader import load_docx
 from app.loaders.image_loader import load_image
 from app.loaders.pdf_loader import load_pdf
+from app.section_extractor import extract_sections
 from app.vectorstore.chroma_store import add_chunks, source_exists
-from app.config import DATA_PATH
-from app.config import DATA_PATH, PARENT_CHUNK_SIZE
 
 
 def get_document_type(file_path: Path) -> str:
@@ -23,6 +22,15 @@ def get_document_type(file_path: Path) -> str:
         return "image"
 
     return "unknown"
+
+
+def get_collection_name(file_path: Path) -> str:
+    document_type = get_document_type(file_path)
+
+    if document_type == "image":
+        return "images"
+
+    return "documents"
 
 
 def load_file(file_path: Path) -> str:
@@ -43,32 +51,52 @@ def load_file(file_path: Path) -> str:
 def ingest_file(file_path: Path) -> None:
     collection_name = get_collection_name(file_path)
 
-    if source_exists(file_path.name, collection_name=collection_name):
+    if source_exists(
+        file_path.name,
+        collection_name=collection_name,
+    ):
         print(f"{file_path.name}: já indexado, pulando")
         return
 
     text = load_file(file_path)
-    chunks = chunk_text(text)
+    sections = extract_sections(text)
 
-    embeddings = [create_embedding(chunk) for chunk in chunks]
-
-    ids = [str(uuid4()) for _ in chunks]
+    ids = []
+    chunks = []
+    embeddings = []
+    metadatas = []
 
     indexed_at = datetime.now(timezone.utc).isoformat()
+    global_chunk_index = 0
 
-    metadatas = [
-        {
-            "source": file_path.name,
-            "file_type": file_path.suffix.lower(),
-            "document_type": get_document_type(file_path),
-            "chunk_index": index,
-            "parent_id": get_parent_id(file_path.name, index),
-            "parent_index": index // PARENT_CHUNK_SIZE,
-            "indexed_at": indexed_at,
-            "collection_name": collection_name,
-        }
-        for index, _ in enumerate(chunks)
-    ]
+    for section_index, section in enumerate(sections):
+        section_chunks = chunk_text(section["text"])
+
+        parent_id = f"{file_path.name}::section_{section['section_id']}"
+
+        for section_chunk_index, chunk in enumerate(section_chunks):
+            ids.append(str(uuid4()))
+            chunks.append(chunk)
+            embeddings.append(create_embedding(chunk))
+
+            metadatas.append(
+                {
+                    "source": file_path.name,
+                    "file_type": file_path.suffix.lower(),
+                    "document_type": get_document_type(file_path),
+                    "collection_name": collection_name,
+                    "chunk_index": global_chunk_index,
+                    "section_chunk_index": section_chunk_index,
+                    "section_index": section_index,
+                    "section_title": section["title"],
+                    "section_id": section["section_id"],
+                    "parent_id": parent_id,
+                    "parent_index": section_index,
+                    "indexed_at": indexed_at,
+                }
+            )
+
+            global_chunk_index += 1
 
     add_chunks(
         ids=ids,
@@ -78,22 +106,7 @@ def ingest_file(file_path: Path) -> None:
         collection_name=collection_name,
     )
 
-    print(f"{file_path.name}: {len(chunks)} chunks indexados")
-
-
-def get_parent_id(file_name: str, chunk_index: int) -> str:
-    parent_index = chunk_index // PARENT_CHUNK_SIZE
-
-    return f"{file_name}::parent_{parent_index}"
-
-
-def get_collection_name(file_path: Path) -> str:
-    document_type = get_document_type(file_path)
-
-    if document_type == "image":
-        return "images"
-
-    return "documents"
+    print(f"{file_path.name}: {len(chunks)} chunks em {len(sections)} seções indexados")
 
 
 if __name__ == "__main__":

@@ -137,3 +137,27 @@ def get_chunks_by_parent_id(
         items,
         key=lambda item: item[1]["chunk_index"],
     )
+
+
+def list_chunks(
+    collection_name: str = "documents",
+) -> list[dict]:
+    collection = get_collection(collection_name)
+
+    results = collection.get(
+        include=[
+            "documents",
+            "metadatas",
+        ],
+    )
+
+    return [
+        {
+            "document": document,
+            "metadata": metadata,
+        }
+        for document, metadata in zip(
+            results["documents"],
+            results["metadatas"],
+        )
+    ]
