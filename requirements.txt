@@ -8,3 +8,5 @@ ruff
 rank-bm25
 qdrant-client
 pytest
+psycopg[binary]
+pgvector

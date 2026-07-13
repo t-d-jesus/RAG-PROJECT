@@ -48,4 +48,11 @@ QDRANT_PATH = "./qdrant_data"
 
 EMBEDDING_DIMENSION = 1536
 
-VECTOR_STORE = "qdrant"
+VECTOR_STORE = "pgvector"
+
+
+POSTGRES_HOST = os.getenv("POSTGRES_HOST", "localhost")
+POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
+POSTGRES_DB = os.getenv("POSTGRES_DB", "rag")
+POSTGRES_USER = os.getenv("POSTGRES_USER", "rag")
+POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "rag")
