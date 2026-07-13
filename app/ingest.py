@@ -9,7 +9,7 @@ from app.loaders.docx_loader import load_docx
 from app.loaders.image_loader import load_image
 from app.loaders.pdf_loader import load_pdf
 from app.section_extractor import extract_sections
-from app.vectorstore.chroma_store import add_chunks, source_exists
+from app.vectorstore.store import add_chunks, source_exists
 
 
 def get_document_type(file_path: Path) -> str:

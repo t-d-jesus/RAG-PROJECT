@@ -22,8 +22,7 @@ from app.question_rewriter import rewrite_question
 from app.reranker import rerank
 from app.retrieval.hybrid_search import hybrid_ranking
 from app.retrieval.parent_retrieval import expand_with_parent
-from app.vectorstore.chroma_store import search_chunks
-
+from app.vectorstore.store import search_chunks
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 

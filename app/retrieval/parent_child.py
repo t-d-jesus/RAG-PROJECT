@@ -1,4 +1,4 @@
-from app.vectorstore.chroma_store import get_neighbor_chunks
+from app.vectorstore.store import get_neighbor_chunks
 
 
 def expand_with_neighbors(

@@ -1,4 +1,4 @@
-from app.vectorstore.chroma_store import list_chunks
+from app.vectorstore.store import list_chunks
 
 
 def inspect_collection(collection_name: str) -> None:

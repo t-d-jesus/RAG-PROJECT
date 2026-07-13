@@ -1,4 +1,4 @@
-from app.vectorstore.chroma_store import get_chunks_by_parent_id
+from app.vectorstore.store import get_chunks_by_parent_id
 
 
 def expand_with_parent(

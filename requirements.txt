@@ -6,3 +6,5 @@ python-docx
 pillow
 ruff
 rank-bm25
+qdrant-client
+pytest
