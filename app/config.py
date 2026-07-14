@@ -18,7 +18,7 @@ EMBEDDING_MODEL = "text-embedding-3-small"
 
 # Storage
 
-CHROMA_PATH = "chroma_db"
+CHROMA_PATH = os.getenv("CHROMA_PATH", "./chroma")
 DATA_PATH = "data/raw"
 
 # Retrieval
@@ -44,8 +44,6 @@ VECTOR_WEIGHT = 0.6
 BM25_WEIGHT = 0.4
 
 
-QDRANT_PATH = "./qdrant_data"
-
 EMBEDDING_DIMENSION = 1536
 
 VECTOR_STORE = os.getenv(
@@ -58,3 +56,6 @@ POSTGRES_PORT = int(os.getenv("POSTGRES_PORT", "5432"))
 POSTGRES_DB = os.getenv("POSTGRES_DB", "rag")
 POSTGRES_USER = os.getenv("POSTGRES_USER", "rag")
 POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "rag")
+
+QDRANT_URL = os.getenv("QDRANT_URL")
+QDRANT_PATH = os.getenv("QDRANT_PATH", "./qdrant_data")

@@ -24,6 +24,8 @@ from app.reranker import rerank
 from app.retrieval.hybrid_search import hybrid_ranking
 from app.retrieval.parent_retrieval import expand_with_parent
 from app.vectorstore.store import search_chunks
+from app.config import VECTOR_STORE
+
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -273,7 +275,8 @@ if __name__ == "__main__":
         print("\nResposta:")
         print(answer)
 
-        print("\nFontes recuperadas pelo Chroma:")
+        print(f"\nVector Store: {pipeline_metrics['vector_store']}")
+        print("Fontes recuperadas:")
         for source in retrieved_sources:
             print(f"- {source}")
 

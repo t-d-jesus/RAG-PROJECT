@@ -1,0 +1,12 @@
+.git
+.github
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+.ruff_cache
+qdrant_data
+tests/results
+.env
+.DS_Store
+chroma_db/
