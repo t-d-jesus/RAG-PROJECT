@@ -252,3 +252,27 @@ rag-project/
 - v0.4.0 - Observability
 - v0.5.0 - BM25 Hybrid Ranking
 
+
+## Supported Vector Stores
+
+The project supports multiple vector-store backends:
+
+| Backend | Status |
+|----------|----------|
+| ChromaDB | ✅ |
+| Qdrant   | ✅ |
+| PostgreSQL + pgvector | ✅ |
+
+Backend selection:
+
+```bash
+export VECTOR_STORE=chroma
+```
+
+```bash
+export VECTOR_STORE=qdrant
+```
+
+```bash
+export VECTOR_STORE=pgvector
+```

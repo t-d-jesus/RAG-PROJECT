@@ -13,6 +13,7 @@ from app.config import (
     OPENAI_API_KEY,
     RERANK_TOP_K,
     RETRIEVAL_RESULTS,
+    VECTOR_STORE,
 )
 from app.context_builder import build_context
 from app.embeddings.openai_embeddings import create_embedding
@@ -55,6 +56,8 @@ def ask(
     dict,
 ]:
     pipeline_metrics = {}
+    pipeline_metrics["vector_store"] = VECTOR_STORE
+
     total_start = time.perf_counter()
 
     if metadata_filter is None:
