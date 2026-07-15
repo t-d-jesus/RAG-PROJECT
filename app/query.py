@@ -25,7 +25,6 @@ from app.retrieval.hybrid_search import hybrid_ranking
 from app.retrieval.parent_retrieval import expand_with_parent
 from app.vectorstore.store import search_chunks
 
-
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 

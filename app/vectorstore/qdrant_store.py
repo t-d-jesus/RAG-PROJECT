@@ -1,5 +1,5 @@
 import atexit
-import os
+
 from qdrant_client import QdrantClient
 from qdrant_client.models import (
     Distance,
@@ -11,9 +11,6 @@ from qdrant_client.models import (
 )
 
 from app.config import EMBEDDING_DIMENSION, QDRANT_PATH, QDRANT_URL
-
-
-QDRANT_URL = os.getenv("QDRANT_URL")
 
 if QDRANT_URL:
     client = QdrantClient(url=QDRANT_URL)

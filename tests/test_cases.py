@@ -96,7 +96,9 @@ TEST_CASES = [
     {
         "id": "metadata_image_001",
         "category": "metadata",
-        "question": "Busque apenas nas imagens: o que perguntaram sobre Sydney Sweeney?",
+        "question": (
+            "Busque apenas nas imagens: o que perguntaram sobre Sydney Sweeney?"
+        ),
         "expected_keywords": ["HOW WELL DOES SYDNEY SWEENEY KNOW HER IMDb PAGE"],
         "expected_sources": IMAGE_SOURCES,
         "expected_retrieval_sources": IMAGE_SOURCES,
@@ -105,7 +107,9 @@ TEST_CASES = [
     {
         "id": "metadata_pdf_001",
         "category": "metadata",
-        "question": "Busque apenas nos PDFs: qual filme é mencionado sobre Sydney Sweeney?",
+        "question": (
+            "Busque apenas nos PDFs: qual filme é mencionado sobre Sydney Sweeney?"
+        ),
         "expected_keywords": ["Anyone But You"],
         "expected_sources": PDF_SOURCES,
         "expected_retrieval_sources": PDF_SOURCES,
@@ -123,7 +127,10 @@ TEST_CASES = [
     {
         "id": "metadata_docx_001",
         "category": "metadata",
-        "question": "Busque apenas nos arquivos Word: quais séries são mencionadas sobre Sydney Sweeney?",
+        "question": (
+            "Busque apenas nos arquivos Word: "
+            "quais séries são mencionadas sobre Sydney Sweeney?"
+        ),
         "expected_keywords": ["Euphoria", "The White Lotus"],
         "expected_sources": DOCX_SOURCES,
         "expected_retrieval_sources": DOCX_SOURCES,

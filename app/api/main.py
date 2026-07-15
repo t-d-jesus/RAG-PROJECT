@@ -20,7 +20,6 @@ from app.ingest import ingest_file
 from app.query import ask
 from app.vectorstore.store import reset_all_collections
 
-
 app = FastAPI(
     title="RAG Platform API",
     description=("RAG API with ChromaDB, Qdrant and PostgreSQL + pgvector."),

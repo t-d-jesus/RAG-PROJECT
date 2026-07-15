@@ -1,7 +1,9 @@
-import psycopg
-from pgvector.psycopg import register_vector
 import json
 from uuid import UUID
+
+import psycopg
+from pgvector import Vector
+from pgvector.psycopg import register_vector
 
 from app.config import (
     EMBEDDING_DIMENSION,
@@ -11,7 +13,6 @@ from app.config import (
     POSTGRES_PORT,
     POSTGRES_USER,
 )
-from pgvector import Vector
 
 
 def get_connection() -> psycopg.Connection:
