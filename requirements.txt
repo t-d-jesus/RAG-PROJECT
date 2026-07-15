@@ -10,3 +10,5 @@ qdrant-client
 pytest
 psycopg[binary]
 pgvector
+fastapi
+uvicorn[standard]

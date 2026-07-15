@@ -24,7 +24,6 @@ from app.reranker import rerank
 from app.retrieval.hybrid_search import hybrid_ranking
 from app.retrieval.parent_retrieval import expand_with_parent
 from app.vectorstore.store import search_chunks
-from app.config import VECTOR_STORE
 
 
 client = OpenAI(api_key=OPENAI_API_KEY)
@@ -93,9 +92,6 @@ def ask(
             documents.extend(results["documents"][0])
             metadatas.extend(results["metadatas"][0])
             distances.extend(results["distances"][0])
-
-    if metadata_filter:
-        print(f"\nFiltro aplicado: {metadata_filter}")
 
     retrieved_sources = list({metadata["source"] for metadata in metadatas})
 
@@ -177,12 +173,16 @@ def ask(
             max_chunks=MAX_CONTEXT_CHUNKS,
             max_chars=MAX_CONTEXT_CHARS,
         )
+        if any(
+            metadata.get("document_type") == "image"
+            for _, metadata, _ in selected_chunks
+        ):
+            print("\nDEBUG CONTEXTO DE IMAGEM:")
+            print(context)
 
     # Citações representam os chunks realmente incluídos no contexto.
     pipeline_metrics["context_chunks"] = len(citations)
     pipeline_metrics["context_chars"] = len(context)
-
-    print(f"\nContexto enviado: {len(context)} caracteres")
 
     with timer(pipeline_metrics, "llm_time"):
         response = client.responses.create(
@@ -195,6 +195,8 @@ Regras:
 - Não invente informações.
 - Se a resposta não estiver no contexto, diga:
   "Não encontrei essa informação nos documentos."
+- Quando a pergunta solicitar o texto, título ou pergunta visível em uma imagem,
+  transcreva literalmente o trecho correspondente presente no contexto.
 - Sempre cite as referências utilizadas.
 - Use o formato [1], [2], [3].
 

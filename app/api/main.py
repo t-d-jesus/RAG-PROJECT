@@ -1,0 +1,164 @@
+from pathlib import Path
+
+from fastapi import FastAPI, HTTPException
+
+from app.api.schemas import (
+    HealthResponse,
+    IngestResponse,
+    MetricsResponse,
+    QueryRequest,
+    QueryResponse,
+    ResetRequest,
+    ResetResponse,
+)
+from app.api.state import (
+    get_last_query_metrics,
+    save_query_metrics,
+)
+from app.config import DATA_PATH, VECTOR_STORE
+from app.ingest import ingest_file
+from app.query import ask
+from app.vectorstore.store import reset_all_collections
+
+
+app = FastAPI(
+    title="RAG Platform API",
+    description=("RAG API with ChromaDB, Qdrant and PostgreSQL + pgvector."),
+    version="1.0.0",
+)
+
+
+@app.get(
+    "/health",
+    response_model=HealthResponse,
+)
+def health() -> HealthResponse:
+    return HealthResponse(
+        status="ok",
+        vector_store=VECTOR_STORE,
+    )
+
+
+@app.post(
+    "/query",
+    response_model=QueryResponse,
+)
+def query(request: QueryRequest) -> QueryResponse:
+    try:
+        history = [message.model_dump() for message in request.history]
+
+        (
+            answer,
+            sources,
+            distances,
+            rewritten_question,
+            citations,
+            retrieved_sources,
+            reranked_sources,
+            confidence,
+            metrics,
+        ) = ask(
+            question=request.question,
+            history=history,
+            metadata_filter=request.metadata_filter,
+        )
+
+        save_query_metrics(metrics)
+
+        return QueryResponse(
+            answer=answer,
+            rewritten_question=rewritten_question,
+            sources=sources,
+            distances=distances,
+            citations=citations,
+            retrieved_sources=retrieved_sources,
+            reranked_sources=reranked_sources,
+            confidence=confidence,
+            metrics=metrics,
+        )
+
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Erro ao processar a consulta.",
+        ) from error
+
+
+@app.post(
+    "/ingest",
+    response_model=IngestResponse,
+)
+def ingest() -> IngestResponse:
+    data_path = Path(DATA_PATH)
+
+    if not data_path.exists():
+        raise HTTPException(
+            status_code=404,
+            detail=f"Diretório de dados não encontrado: {DATA_PATH}",
+        )
+
+    indexed_files = []
+    skipped_files = []
+    failed_files = []
+
+    for file_path in data_path.iterdir():
+        if not file_path.is_file():
+            continue
+
+        try:
+            result = ingest_file(file_path)
+
+            if result == "indexed":
+                indexed_files.append(file_path.name)
+            elif result == "skipped":
+                skipped_files.append(file_path.name)
+
+        except Exception:
+            failed_files.append(file_path.name)
+
+    status = "completed"
+
+    if failed_files:
+        status = "completed_with_errors"
+
+    return IngestResponse(
+        status=status,
+        indexed_files=indexed_files,
+        skipped_files=skipped_files,
+        failed_files=failed_files,
+    )
+
+
+@app.post(
+    "/reset",
+    response_model=ResetResponse,
+)
+def reset(request: ResetRequest) -> ResetResponse:
+    if not request.confirm:
+        raise HTTPException(
+            status_code=400,
+            detail=('Confirmação obrigatória. Envie {"confirm": true}.'),
+        )
+
+    try:
+        reset_all_collections()
+    except Exception as error:
+        raise HTTPException(
+            status_code=500,
+            detail="Erro ao resetar o vector store.",
+        ) from error
+
+    return ResetResponse(
+        status="reset_completed",
+        vector_store=VECTOR_STORE,
+    )
+
+
+@app.get(
+    "/metrics",
+    response_model=MetricsResponse,
+)
+def metrics() -> MetricsResponse:
+    return MetricsResponse(
+        metrics=get_last_query_metrics(),
+    )

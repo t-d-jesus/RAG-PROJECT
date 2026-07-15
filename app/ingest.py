@@ -48,7 +48,7 @@ def load_file(file_path: Path) -> str:
     raise ValueError(f"Tipo não suportado: {suffix}")
 
 
-def ingest_file(file_path: Path) -> None:
+def ingest_file(file_path: Path) -> str:
     collection_name = get_collection_name(file_path)
 
     if source_exists(
@@ -56,7 +56,7 @@ def ingest_file(file_path: Path) -> None:
         collection_name=collection_name,
     ):
         print(f"{file_path.name}: já indexado, pulando")
-        return
+        return "skipped"
 
     text = load_file(file_path)
     sections = extract_sections(text)
@@ -107,6 +107,7 @@ def ingest_file(file_path: Path) -> None:
     )
 
     print(f"{file_path.name}: {len(chunks)} chunks em {len(sections)} seções indexados")
+    return "indexed"
 
 
 if __name__ == "__main__":

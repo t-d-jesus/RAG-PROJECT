@@ -276,3 +276,32 @@ export VECTOR_STORE=qdrant
 ```bash
 export VECTOR_STORE=pgvector
 ```
+
+## API
+
+Run:
+
+```bash
+uvicorn app.api.main:app --reload
+```
+
+Swagger:
+
+http://localhost:8000/docs
+
+
+GET  /health
+POST /query
+POST /ingest
+POST /reset
+GET  /metrics
+
+
+curl -X POST \
+  http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Quem é Sydney Sweeney?"
+  }'
+
+  
