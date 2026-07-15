@@ -9,7 +9,6 @@ from app.config import (
     OPENSEARCH_VERIFY_CERTS,
 )
 
-
 client = OpenSearch(
     hosts=[
         {
