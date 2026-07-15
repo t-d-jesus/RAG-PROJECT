@@ -59,3 +59,36 @@ POSTGRES_PASSWORD = os.getenv("POSTGRES_PASSWORD", "rag")
 
 QDRANT_URL = os.getenv("QDRANT_URL")
 QDRANT_PATH = os.getenv("QDRANT_PATH", "./qdrant_data")
+
+OPENSEARCH_HOST = os.getenv(
+    "OPENSEARCH_HOST",
+    "localhost",
+)
+
+OPENSEARCH_PORT = int(
+    os.getenv(
+        "OPENSEARCH_PORT",
+        "9200",
+    )
+)
+
+OPENSEARCH_USE_SSL = (
+    os.getenv(
+        "OPENSEARCH_USE_SSL",
+        "false",
+    ).lower()
+    == "true"
+)
+
+OPENSEARCH_VERIFY_CERTS = (
+    os.getenv(
+        "OPENSEARCH_VERIFY_CERTS",
+        "false",
+    ).lower()
+    == "true"
+)
+
+OPENSEARCH_INDEX_PREFIX = os.getenv(
+    "OPENSEARCH_INDEX_PREFIX",
+    "rag",
+)

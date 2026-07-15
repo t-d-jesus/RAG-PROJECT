@@ -1,56 +1,133 @@
 # RAG Project
 
-Projeto de estudo de Retrieval-Augmented Generation (RAG) utilizando:
+A Retrieval-Augmented Generation (RAG) platform built for learning and experimentation with modern GenAI architectures.
 
-- OpenAI Embeddings
-- OpenAI Responses API
-- ChromaDB
-- PDF, DOCX e imagens
-- Reranking
+The project supports multiple document formats, multiple vector stores, hybrid retrieval strategies, evaluation pipelines, REST APIs, Docker environments, and CI/CD automation.
+
+---
+
+## Features
+
+### Data Ingestion
+
+- PDF Loader
+- DOCX Loader
+- Image Loader (OpenAI Vision)
+- Automatic chunking
+- Parent-child document structure
+
+### Retrieval
+
+- Vector Search
+- BM25 Search
 - Hybrid Search
 - Metadata Filtering
+- Parent Retrieval
+- Neighbor Retrieval
+- Context Expansion
+- Reranking
+
+### Vector Stores
+
+- ChromaDB
+- Qdrant
+- PostgreSQL + pgvector
+- OpenSearch
+
+### API
+
+- FastAPI
+- OpenAPI / Swagger
+
+### Infrastructure
+
+- Docker
+- Docker Compose
+
+### Quality
+
 - Evaluation Framework
+- Confidence Score
+- GitHub Actions CI/CD
 
 ---
 
-## Pré-requisitos
+## Architecture
+
+```txt
+Documents
+    │
+    ▼
+Loaders
+(PDF / DOCX / Images)
+    │
+    ▼
+Chunking
+    │
+    ▼
+OpenAI Embeddings
+    │
+    ▼
+Vector Store
+(Chroma / Qdrant / pgvector / OpenSearch)
+    │
+    ▼
+Hybrid Retrieval
+(Vector + BM25)
+    │
+    ▼
+Reranker
+    │
+    ▼
+Parent Retrieval
+    │
+    ▼
+Context Builder
+    │
+    ▼
+OpenAI Responses API
+```
+
+---
+
+## Prerequisites
 
 - Python 3.13+
-- Conta OpenAI
-- Chave de API OpenAI
+- OpenAI API Key
+- Docker (optional)
 
 ---
 
-## Instalação
+## Installation
 
-Clone o projeto:
+Clone the repository:
 
 ```bash
-git clone <repositorio>
+git clone <repository>
 cd rag-project
 ```
 
-Crie o ambiente virtual:
+Create a virtual environment:
 
 ```bash
 python -m venv .venv
 ```
 
-Ative o ambiente:
+Activate it:
 
-Mac/Linux:
+### macOS / Linux
 
 ```bash
 source .venv/bin/activate
 ```
 
-Windows:
+### Windows
 
 ```bash
 .venv\Scripts\activate
 ```
 
-Instale as dependências:
+Install dependencies:
 
 ```bash
 pip install -r requirements.txt
@@ -58,40 +135,40 @@ pip install -r requirements.txt
 
 ---
 
-## Configuração da OpenAI
+## OpenAI Configuration
 
-Crie um arquivo `.env` na raiz do projeto:
+Create a `.env` file:
 
 ```env
-OPENAI_API_KEY=sua_chave_aqui
+OPENAI_API_KEY=your_api_key
 ```
 
-Exemplo:
+Example:
 
 ```env
-OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxx
+OPENAI_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
 ```
 
 ---
 
-## Adicionando documentos
+## Supported File Types
 
-Coloque seus arquivos na pasta:
+Place your files in:
 
 ```txt
 data/raw/
 ```
 
-Exemplo:
+Example:
 
 ```txt
 data/raw/
-├── documento.pdf
-├── documento.docx
-└── imagem.jpg
+├── document.pdf
+├── document.docx
+└── image.jpg
 ```
 
-Tipos suportados:
+Supported formats:
 
 - PDF
 - DOCX
@@ -101,92 +178,147 @@ Tipos suportados:
 
 ---
 
-## Indexação dos documentos
+# Vector Store Configuration
 
-Antes de consultar os documentos, é necessário gerar os embeddings e indexá-los no ChromaDB.
+The project supports multiple vector-store backends.
 
-Execute:
+Choose one:
+
+### ChromaDB
+
+```bash
+export VECTOR_STORE=chroma
+```
+
+### Qdrant
+
+```bash
+export VECTOR_STORE=qdrant
+```
+
+### PostgreSQL + pgvector
+
+```bash
+export VECTOR_STORE=pgvector
+```
+
+### OpenSearch
+
+```bash
+export VECTOR_STORE=opensearch
+```
+
+---
+
+## Supported Vector Stores
+
+| Backend | Status |
+|----------|----------|
+| ChromaDB | ✅ |
+| Qdrant | ✅ |
+| PostgreSQL + pgvector | ✅ |
+| OpenSearch | ✅ |
+
+---
+
+# Document Ingestion
+
+Generate embeddings and index documents:
 
 ```bash
 python -m app.ingest
 ```
 
-Exemplo de saída:
+Example:
 
 ```txt
-documento.pdf: 5 chunks indexados
-documento.docx: 3 chunks indexados
-imagem.jpg: 1 chunks indexados
+document.pdf: 5 chunks indexed
+document.docx: 3 chunks indexed
+image.jpg: 1 chunk indexed
 ```
 
 ---
 
-## Consultando os documentos
+# Querying Documents
 
-Execute:
+Run:
 
 ```bash
 python -m app.query
 ```
 
-Exemplo:
+Example:
 
 ```txt
-Pergunta: Qual filme é mencionado?
+Question:
+What movie is mentioned?
 ```
 
-Para sair:
-
-```txt
-sair
-```
-
-ou
+Exit:
 
 ```txt
 exit
 ```
 
+or
+
+```txt
+quit
+```
+
 ---
 
-## Executando a avaliação
+# Evaluation Framework
 
-O projeto possui uma suíte de testes para validar:
+The project contains an automated evaluation suite validating:
 
 - Retrieval
 - Reranking
 - Answer Quality
 - Metadata Filtering
 
-Execute:
+Run:
 
 ```bash
 python -m tests.evaluate
 ```
 
-Exemplo:
+Example:
 
 ```txt
-Resumo geral:
-Total: 8
-Retrieval: 8/8
-Rerank: 8/8
-Answer: 8/8
-Overall: 8/8
-Score: 100.00%
+Summary:
+Total: 15
+Retrieval: 15/15
+Rerank: 15/15
+Answer: 15/15
+Overall: 15/15
+Score: 100%
 ```
 
 ---
 
-## Resetando a base vetorial
+# Vector Store Benchmark
 
-Caso queira recriar o índice:
+Current benchmark results:
+
+| Backend | Retrieval | Rerank | Answer | Overall |
+|----------|----------|----------|----------|----------|
+| ChromaDB | 15/15 | 15/15 | 15/15 | 15/15 |
+| Qdrant | 15/15 | 15/15 | 15/15 | 15/15 |
+| PostgreSQL + pgvector | 15/15 | 15/15 | 15/15 | 15/15 |
+| OpenSearch | 15/15 | 15/15 | 15/15 | 15/15 |
+
+---
+
+# Reset Vector Store
+
+Reset the selected backend:
 
 ```bash
-python reset_chroma.py
+python reset_vector_store.py
 ```
 
-Depois execute novamente a ingestão:
+Re-ingest the documents:
 
 ```bash
 python -m app.ingest
@@ -194,18 +326,178 @@ python -m app.ingest
 
 ---
 
-## Estrutura do projeto
+# FastAPI
+
+Run locally:
+
+```bash
+uvicorn app.api.main:app --reload
+```
+
+Swagger UI:
+
+```txt
+http://localhost:8000/docs
+```
+
+---
+
+## API Endpoints
+
+### Health Check
+
+```http
+GET /health
+```
+
+### Query Documents
+
+```http
+POST /query
+```
+
+Example:
+
+```bash
+curl -X POST \
+  http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "question": "Who is Sydney Sweeney?"
+  }'
+```
+
+### Ingest Documents
+
+```http
+POST /ingest
+```
+
+### Reset Vector Store
+
+```http
+POST /reset
+```
+
+### Metrics
+
+```http
+GET /metrics
+```
+
+---
+
+# Docker
+
+Build:
+
+```bash
+docker compose build
+```
+
+Start services:
+
+```bash
+docker compose up -d
+```
+
+Check status:
+
+```bash
+docker compose ps
+```
+
+---
+
+## Available Services
+
+| Service | Port |
+|----------|----------|
+| FastAPI | 8000 |
+| PostgreSQL | 5432 |
+| Qdrant | 6333 |
+| OpenSearch | 9200 |
+| OpenSearch Dashboard | 5601 |
+
+---
+
+# OpenSearch Dashboard
+
+Start:
+
+```bash
+docker compose up -d opensearch
+docker compose up -d opensearch-dashboards
+```
+
+Access:
+
+```txt
+http://localhost:5601
+```
+
+Useful queries:
+
+### List indices
+
+```json
+GET _cat/indices?v
+```
+
+### Count documents
+
+```json
+GET rag-documents/_count
+```
+
+```json
+GET rag-images/_count
+```
+
+### Search documents
+
+```json
+GET rag-documents/_search
+{
+  "size": 5
+}
+```
+
+### View mappings
+
+```json
+GET rag-documents/_mapping
+```
+
+---
+
+# Continuous Integration
+
+GitHub Actions automatically executes:
+
+- Ruff Lint
+- Ruff Format Check
+- Unit Tests
+- Docker Build Validation
+
+Triggered on:
+
+- Push to main
+- Pull Requests
+
+---
+
+# Project Structure
 
 ```txt
 rag-project/
 │
 ├── app/
+│   ├── api/
 │   ├── embeddings/
 │   ├── loaders/
 │   ├── retrieval/
-│   ├── settings/
 │   ├── vectorstore/
-│   ├── chunker.py
 │   ├── ingest.py
 │   ├── query.py
 │   └── ...
@@ -215,93 +507,42 @@ rag-project/
 │
 ├── tests/
 │   ├── unit/
-│   ├── results/
+│   ├── integration/
+│   ├── manual/
 │   ├── evaluate.py
+│   ├── metrics.py
 │   └── test_cases.py
 │
+├── .github/
+│   └── workflows/
+│
 ├── chroma/
-├── .env
+├── qdrant_data/
+├── Dockerfile
+├── docker-compose.yml
 ├── requirements.txt
 ├── pyproject.toml
+├── LICENSE
 └── README.md
 ```
 
 ---
 
-## Funcionalidades
-
-- PDF Loader
-- DOCX Loader
-- Image Loader (Vision)
-- Chunking
-- OpenAI Embeddings
-- ChromaDB
-- Hybrid Search
-- Metadata Filtering
-- Reranking
-- Context Expansion
-- Conversational Memory
-- Evaluation Framework
-
-
-## Releases
+# Releases
 
 - v0.1.0 - Initial RAG
-- v0.2.0 - Parent Retrieval
-- v0.3.0 - Multi Collections
-- v0.4.0 - Observability
 - v0.5.0 - BM25 Hybrid Ranking
+- v0.6.0 - Parent Retrieval
+- v0.7.0 - Qdrant Integration
+- v0.8.0 - PostgreSQL + pgvector
+- v0.9.0 - Benchmark + MIT License
+- v0.10.0 - Dockerization
+- v1.0.0 - FastAPI Service
+- v1.1.0 - CI/CD Pipeline
+- v1.2.0 - OpenSearch Integration
 
+---
 
-## Supported Vector Stores
+# License
 
-The project supports multiple vector-store backends:
-
-| Backend | Status |
-|----------|----------|
-| ChromaDB | ✅ |
-| Qdrant   | ✅ |
-| PostgreSQL + pgvector | ✅ |
-
-Backend selection:
-
-```bash
-export VECTOR_STORE=chroma
-```
-
-```bash
-export VECTOR_STORE=qdrant
-```
-
-```bash
-export VECTOR_STORE=pgvector
-```
-
-## API
-
-Run:
-
-```bash
-uvicorn app.api.main:app --reload
-```
-
-Swagger:
-
-http://localhost:8000/docs
-
-
-GET  /health
-POST /query
-POST /ingest
-POST /reset
-GET  /metrics
-
-
-curl -X POST \
-  http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "question": "Quem é Sydney Sweeney?"
-  }'
-
-  
+This project is licensed under the MIT License.
