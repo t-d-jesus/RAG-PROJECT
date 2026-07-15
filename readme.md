@@ -50,6 +50,37 @@ The project supports multiple document formats, multiple vector stores, hybrid r
 - Confidence Score
 - GitHub Actions CI/CD
 
+
+## Hybrid Search Modes
+
+### Local Hybrid Search
+
+Used by:
+
+- ChromaDB
+- Qdrant
+- PostgreSQL + pgvector
+
+Pipeline:
+
+Vector Search
+→ BM25
+→ Hybrid Ranking
+→ Reranker
+
+### OpenSearch Native Hybrid Search
+
+Used by:
+
+- OpenSearch
+
+Pipeline:
+
+BM25
++ Vector Search
++ Score Fusion
+→ Reranker
+
 ---
 
 ## Architecture

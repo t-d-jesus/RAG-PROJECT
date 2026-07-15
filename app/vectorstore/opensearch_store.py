@@ -1,12 +1,15 @@
 from opensearchpy import OpenSearch, helpers
 
 from app.config import (
+    BM25_WEIGHT,
     EMBEDDING_DIMENSION,
     OPENSEARCH_HOST,
+    OPENSEARCH_HYBRID_PIPELINE,
     OPENSEARCH_INDEX_PREFIX,
     OPENSEARCH_PORT,
     OPENSEARCH_USE_SSL,
     OPENSEARCH_VERIFY_CERTS,
+    VECTOR_WEIGHT,
 )
 
 client = OpenSearch(
@@ -312,3 +315,136 @@ def get_neighbor_chunks(
         )
         for hit in response["hits"]["hits"]
     ]
+
+
+def ensure_hybrid_pipeline() -> None:
+    if not abs((BM25_WEIGHT + VECTOR_WEIGHT) - 1.0) < 1e-9:
+        raise ValueError("BM25_WEIGHT e VECTOR_WEIGHT devem somar 1.0.")
+
+    client.transport.perform_request(
+        "PUT",
+        f"/_search/pipeline/{OPENSEARCH_HYBRID_PIPELINE}",
+        body={
+            "description": ("Normalize and combine BM25 and vector scores."),
+            "phase_results_processors": [
+                {
+                    "normalization-processor": {
+                        "normalization": {
+                            "technique": "min_max",
+                        },
+                        "combination": {
+                            "technique": "arithmetic_mean",
+                            "parameters": {
+                                "weights": [
+                                    BM25_WEIGHT,
+                                    VECTOR_WEIGHT,
+                                ],
+                            },
+                        },
+                    }
+                }
+            ],
+        },
+    )
+
+
+def build_hybrid_filter(
+    where: dict | None,
+) -> dict | None:
+    if not where:
+        return None
+
+    conditions = [
+        {
+            "term": {
+                f"metadata.{key}.keyword": value,
+            }
+        }
+        for key, value in where.items()
+    ]
+
+    if len(conditions) == 1:
+        return conditions[0]
+
+    return {
+        "bool": {
+            "must": conditions,
+        }
+    }
+
+
+def search_hybrid_chunks(
+    question: str,
+    query_embedding: list[float],
+    n_results: int = 5,
+    where: dict | None = None,
+    collection_name: str = "documents",
+) -> dict:
+    ensure_index(collection_name)
+    ensure_hybrid_pipeline()
+
+    hybrid_query: dict = {
+        "queries": [
+            {
+                "match": {
+                    "document": {
+                        "query": question,
+                    }
+                }
+            },
+            {
+                "knn": {
+                    "embedding": {
+                        "vector": query_embedding,
+                        "k": n_results,
+                    }
+                }
+            },
+        ]
+    }
+
+    search_filter = build_hybrid_filter(where)
+
+    if search_filter:
+        hybrid_query["filter"] = search_filter
+
+    response = client.search(
+        index=get_index_name(collection_name),
+        params={
+            "search_pipeline": OPENSEARCH_HYBRID_PIPELINE,
+        },
+        body={
+            "size": n_results,
+            "_source": {
+                "excludes": ["embedding"],
+            },
+            "query": {
+                "hybrid": hybrid_query,
+            },
+        },
+    )
+
+    documents = []
+    metadatas = []
+    distances = []
+    scores = []
+
+    for hit in response["hits"]["hits"]:
+        source = hit["_source"]
+        score = float(hit["_score"] or 0.0)
+
+        documents.append(source["document"])
+        metadatas.append(source["metadata"])
+        scores.append(score)
+
+        # Compatibilidade temporária com o pipeline atual.
+        # Não representa distância vetorial pura.
+        normalized_score = min(max(score, 0.0), 1.0)
+        distances.append(1.0 - normalized_score)
+
+    return {
+        "documents": [documents],
+        "metadatas": [metadatas],
+        "distances": [distances],
+        "scores": [scores],
+    }

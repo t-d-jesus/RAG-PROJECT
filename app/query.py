@@ -23,7 +23,10 @@ from app.question_rewriter import rewrite_question
 from app.reranker import rerank
 from app.retrieval.hybrid_search import hybrid_ranking
 from app.retrieval.parent_retrieval import expand_with_parent
-from app.vectorstore.store import search_chunks
+from app.vectorstore.store import (
+    search_chunks,
+    search_hybrid_chunks,
+)
 
 client = OpenAI(api_key=OPENAI_API_KEY)
 
@@ -55,65 +58,134 @@ def ask(
     dict,
     dict,
 ]:
-    pipeline_metrics = {}
-    pipeline_metrics["vector_store"] = VECTOR_STORE
+    pipeline_metrics: dict = {
+        "vector_store": VECTOR_STORE,
+    }
 
     total_start = time.perf_counter()
 
     if metadata_filter is None:
         metadata_filter = detect_metadata_filter(question)
 
-    with timer(pipeline_metrics, "question_rewrite_time"):
+    with timer(
+        pipeline_metrics,
+        "question_rewrite_time",
+    ):
         rewritten_question = rewrite_question(
             question=question,
             conversation_history=history,
         )
 
-    with timer(pipeline_metrics, "embedding_time"):
-        query_embedding = create_embedding(rewritten_question)
+    with timer(
+        pipeline_metrics,
+        "embedding_time",
+    ):
+        query_embedding = create_embedding(
+            rewritten_question,
+        )
 
-    collection_names = get_collections_from_filter(metadata_filter)
+    collection_names = get_collections_from_filter(
+        metadata_filter,
+    )
 
-    documents = []
-    metadatas = []
-    distances = []
+    documents: list[str] = []
+    metadatas: list[dict] = []
+    distances: list[float] = []
 
-    with timer(pipeline_metrics, "retrieval_time"):
+    native_hybrid_search = (
+        VECTOR_STORE == "opensearch" and search_hybrid_chunks is not None
+    )
+
+    pipeline_metrics["retrieval_mode"] = (
+        "opensearch_native_hybrid" if native_hybrid_search else "local_hybrid"
+    )
+
+    with timer(
+        pipeline_metrics,
+        "retrieval_time",
+    ):
         for collection_name in collection_names:
-            results = search_chunks(
-                query_embedding=query_embedding,
-                n_results=RETRIEVAL_RESULTS,
-                where=metadata_filter,
-                collection_name=collection_name,
-            )
+            if native_hybrid_search:
+                results = search_hybrid_chunks(
+                    question=rewritten_question,
+                    query_embedding=query_embedding,
+                    n_results=RETRIEVAL_RESULTS,
+                    where=metadata_filter,
+                    collection_name=collection_name,
+                )
+            else:
+                results = search_chunks(
+                    query_embedding=query_embedding,
+                    n_results=RETRIEVAL_RESULTS,
+                    where=metadata_filter,
+                    collection_name=collection_name,
+                )
 
-            # Precisa ficar dentro do for.
-            documents.extend(results["documents"][0])
-            metadatas.extend(results["metadatas"][0])
-            distances.extend(results["distances"][0])
+            documents.extend(
+                results["documents"][0],
+            )
+            metadatas.extend(
+                results["metadatas"][0],
+            )
+            distances.extend(
+                results["distances"][0],
+            )
 
     retrieved_sources = list({metadata["source"] for metadata in metadatas})
 
-    all_candidates = list(zip(documents, metadatas, distances))
-
-    if ENABLE_DISTANCE_FILTER:
-        candidates = [
-            (document, metadata, distance)
-            for document, metadata, distance in all_candidates
-            if distance <= MAX_DISTANCE
-        ]
-    else:
-        candidates = all_candidates
-
-    with timer(pipeline_metrics, "hybrid_ranking_time"):
-        candidates = hybrid_ranking(
-            question=rewritten_question,
-            candidates=candidates,
+    all_candidates = list(
+        zip(
+            documents,
+            metadatas,
+            distances,
         )
+    )
+
+    if native_hybrid_search:
+        # O OpenSearch já executou:
+        # - BM25
+        # - busca vetorial
+        # - normalização
+        # - fusão dos scores
+        #
+        # As distâncias retornadas neste modo são derivadas do
+        # score híbrido, e não representam distância vetorial pura.
+        candidates = all_candidates
+        pipeline_metrics["hybrid_ranking_time"] = 0.0
+    else:
+        if ENABLE_DISTANCE_FILTER:
+            candidates = [
+                (
+                    document,
+                    metadata,
+                    distance,
+                )
+                for (
+                    document,
+                    metadata,
+                    distance,
+                ) in all_candidates
+                if distance <= MAX_DISTANCE
+            ]
+        else:
+            candidates = all_candidates
+
+        with timer(
+            pipeline_metrics,
+            "hybrid_ranking_time",
+        ):
+            candidates = hybrid_ranking(
+                question=rewritten_question,
+                candidates=candidates,
+            )
 
     pipeline_metrics["collections"] = collection_names
-    pipeline_metrics["retrieved_chunks"] = len(all_candidates)
-    pipeline_metrics["filtered_candidates"] = len(candidates)
+    pipeline_metrics["retrieved_chunks"] = len(
+        all_candidates,
+    )
+    pipeline_metrics["filtered_candidates"] = len(
+        candidates,
+    )
 
     if not candidates:
         confidence = {
@@ -145,7 +217,10 @@ def ask(
 
     candidate_documents = [document for document, _, _ in candidates]
 
-    with timer(pipeline_metrics, "rerank_time"):
+    with timer(
+        pipeline_metrics,
+        "rerank_time",
+    ):
         selected_indexes = rerank(
             question=rewritten_question,
             documents=candidate_documents,
@@ -154,36 +229,45 @@ def ask(
 
     reranked_chunks = [candidates[index] for index in selected_indexes]
 
-    # Fontes selecionadas diretamente pelo reranker.
     reranked_sources = list({metadata["source"] for _, metadata, _ in reranked_chunks})
 
-    pipeline_metrics["reranked_chunks"] = len(reranked_chunks)
+    pipeline_metrics["reranked_chunks"] = len(
+        reranked_chunks,
+    )
 
-    with timer(pipeline_metrics, "parent_retrieval_time"):
+    with timer(
+        pipeline_metrics,
+        "parent_retrieval_time",
+    ):
         selected_chunks = expand_with_parent(
             selected_chunks=reranked_chunks,
         )
 
-    pipeline_metrics["expanded_chunks"] = len(selected_chunks)
+    pipeline_metrics["expanded_chunks"] = len(
+        selected_chunks,
+    )
 
-    with timer(pipeline_metrics, "context_build_time"):
+    with timer(
+        pipeline_metrics,
+        "context_build_time",
+    ):
         context, citations = build_context(
             selected_chunks=selected_chunks,
             max_chunks=MAX_CONTEXT_CHUNKS,
             max_chars=MAX_CONTEXT_CHARS,
         )
-        if any(
-            metadata.get("document_type") == "image"
-            for _, metadata, _ in selected_chunks
-        ):
-            print("\nDEBUG CONTEXTO DE IMAGEM:")
-            print(context)
 
-    # Citações representam os chunks realmente incluídos no contexto.
-    pipeline_metrics["context_chunks"] = len(citations)
-    pipeline_metrics["context_chars"] = len(context)
+    pipeline_metrics["context_chunks"] = len(
+        citations,
+    )
+    pipeline_metrics["context_chars"] = len(
+        context,
+    )
 
-    with timer(pipeline_metrics, "llm_time"):
+    with timer(
+        pipeline_metrics,
+        "llm_time",
+    ):
         response = client.responses.create(
             model=CHAT_MODEL,
             input=f"""
@@ -194,8 +278,10 @@ Regras:
 - Não invente informações.
 - Se a resposta não estiver no contexto, diga:
   "Não encontrei essa informação nos documentos."
-- Quando a pergunta solicitar o texto, título ou pergunta visível em uma imagem,
-  transcreva literalmente o trecho correspondente presente no contexto.
+- Quando a pergunta solicitar texto, título ou pergunta visível em uma imagem,
+  copie exatamente o trecho presente no contexto.
+- Não traduza, não parafraseie e não altere capitalização,
+  pontuação ou idioma desse trecho.
 - Sempre cite as referências utilizadas.
 - Use o formato [1], [2], [3].
 
@@ -212,9 +298,15 @@ Pergunta:
     sources = [
         {
             "source": metadata["source"],
-            "file_type": metadata.get("file_type"),
-            "document_type": metadata.get("document_type"),
-            "chunk_index": metadata.get("chunk_index"),
+            "file_type": metadata.get(
+                "file_type",
+            ),
+            "document_type": metadata.get(
+                "document_type",
+            ),
+            "chunk_index": metadata.get(
+                "chunk_index",
+            ),
         }
         for _, metadata, _ in selected_chunks
     ]
@@ -250,7 +342,11 @@ if __name__ == "__main__":
     while True:
         question = input("\nPergunta: ")
 
-        if question.lower() in ["sair", "exit", "quit"]:
+        if question.lower() in [
+            "sair",
+            "exit",
+            "quit",
+        ]:
             break
 
         (
@@ -277,7 +373,9 @@ if __name__ == "__main__":
         print(answer)
 
         print(f"\nVector Store: {pipeline_metrics['vector_store']}")
-        print("Fontes recuperadas:")
+        print(f"Retrieval Mode: {pipeline_metrics['retrieval_mode']}")
+
+        print("\nFontes recuperadas:")
         for source in retrieved_sources:
             print(f"- {source}")
 
@@ -289,12 +387,18 @@ if __name__ == "__main__":
         if not sources:
             print("- nenhum chunk relevante encontrado")
         else:
-            for source, distance in zip(sources, distances):
+            for source, distance in zip(
+                sources,
+                distances,
+            ):
                 print(
                     f"- {source['source']} "
-                    f"| type {source.get('document_type')} "
-                    f"| chunk {source['chunk_index']} "
-                    f"| distance={distance:.4f}"
+                    f"| type "
+                    f"{source.get('document_type')} "
+                    f"| chunk "
+                    f"{source['chunk_index']} "
+                    f"| distance="
+                    f"{distance:.4f}"
                 )
 
         print("\nReferências:")
@@ -302,8 +406,10 @@ if __name__ == "__main__":
             print(
                 f"{citation['reference']} "
                 f"{citation['source']} "
-                f"(chunk {citation['chunk_index']}, "
-                f"distance={citation['distance']:.4f})"
+                f"(chunk "
+                f"{citation['chunk_index']}, "
+                f"distance="
+                f"{citation['distance']:.4f})"
             )
 
         print("\nMétricas:")
@@ -316,6 +422,7 @@ if __name__ == "__main__":
                 "content": question,
             }
         )
+
         history.append(
             {
                 "role": "assistant",

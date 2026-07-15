@@ -8,6 +8,7 @@ if VECTOR_STORE == "opensearch":
         reset_all_collections,
         reset_collection,
         search_chunks,
+        search_hybrid_chunks,
         source_exists,
     )
 elif VECTOR_STORE == "qdrant":
@@ -20,6 +21,8 @@ elif VECTOR_STORE == "qdrant":
         search_chunks,
         source_exists,
     )
+
+    search_hybrid_chunks = None
 elif VECTOR_STORE == "pgvector":
     from app.vectorstore.pgvector_store import (
         add_chunks,
@@ -30,6 +33,8 @@ elif VECTOR_STORE == "pgvector":
         search_chunks,
         source_exists,
     )
+
+    search_hybrid_chunks = None
 else:
     from app.vectorstore.chroma_store import (
         add_chunks,
@@ -41,6 +46,8 @@ else:
         source_exists,
     )
 
+    search_hybrid_chunks = None
+
 
 __all__ = [
     "add_chunks",
@@ -49,5 +56,6 @@ __all__ = [
     "reset_all_collections",
     "reset_collection",
     "search_chunks",
+    "search_hybrid_chunks",
     "source_exists",
 ]
