@@ -5,6 +5,8 @@ from openai import OpenAI
 from app.confidence import calculate_confidence
 from app.config import (
     CHAT_MODEL,
+    OPENAI_INPUT_PRICE_PER_MILLION,
+    OPENAI_OUTPUT_PRICE_PER_MILLION,
     ENABLE_DISTANCE_FILTER,
     MAX_CONTEXT_CHARS,
     MAX_CONTEXT_CHUNKS,
@@ -295,6 +297,33 @@ Pergunta:
 """,
         )
 
+    usage = response.usage
+
+    input_tokens = usage.input_tokens
+    output_tokens = usage.output_tokens
+    total_tokens = usage.total_tokens
+
+    input_cost_usd = input_tokens / 1_000_000 * OPENAI_INPUT_PRICE_PER_MILLION
+
+    output_cost_usd = output_tokens / 1_000_000 * OPENAI_OUTPUT_PRICE_PER_MILLION
+
+    estimated_cost_usd = input_cost_usd + output_cost_usd
+
+    pipeline_metrics["input_tokens"] = input_tokens
+    pipeline_metrics["output_tokens"] = output_tokens
+    pipeline_metrics["total_tokens"] = total_tokens
+    pipeline_metrics["input_cost_usd"] = round(
+        input_cost_usd,
+        8,
+    )
+    pipeline_metrics["output_cost_usd"] = round(
+        output_cost_usd,
+        8,
+    )
+    pipeline_metrics["estimated_cost_usd"] = round(
+        estimated_cost_usd,
+        8,
+    )
     sources = [
         {
             "source": metadata["source"],

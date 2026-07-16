@@ -13,3 +13,4 @@ pgvector
 fastapi
 uvicorn[standard]
 opensearch-py
+prometheus-client

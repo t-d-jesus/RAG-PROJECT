@@ -517,6 +517,28 @@ Triggered on:
 - Pull Requests
 
 ---
+## Observability Stack
+
+- Prometheus
+- Grafana
+- Query Metrics
+- Retrieval Metrics
+- Confidence Metrics
+  - Confidence Score
+  - Confidence Level
+- Token Usage
+- Cost Tracking
+
+### Technologies
+
+- Prometheus
+- Grafana
+
+### Dashboard
+
+![Grafana Dashboard](images/image.png)
+
+---
 
 # Project Structure
 

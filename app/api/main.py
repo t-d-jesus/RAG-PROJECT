@@ -1,7 +1,13 @@
 from pathlib import Path
 
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Response
+from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
 
+from app.api.prometheus_metrics import (
+    initialize_metrics,
+    observe_query_error,
+    observe_query_metrics,
+)
 from app.api.schemas import (
     HealthResponse,
     IngestResponse,
@@ -23,7 +29,11 @@ from app.vectorstore.store import reset_all_collections
 app = FastAPI(
     title="RAG Platform API",
     description=("RAG API with ChromaDB, Qdrant and PostgreSQL + pgvector."),
-    version="1.0.0",
+    version="1.4.0",
+)
+
+initialize_metrics(
+    vector_store=VECTOR_STORE,
 )
 
 
@@ -64,6 +74,11 @@ def query(request: QueryRequest) -> QueryResponse:
 
         save_query_metrics(metrics)
 
+        observe_query_metrics(
+            metrics=metrics,
+            confidence=confidence,
+        )
+
         return QueryResponse(
             answer=answer,
             rewritten_question=rewritten_question,
@@ -77,6 +92,10 @@ def query(request: QueryRequest) -> QueryResponse:
         )
 
     except Exception as error:
+        observe_query_error(
+            vector_store=VECTOR_STORE,
+        )
+
         raise HTTPException(
             status_code=500,
             detail="Erro ao processar a consulta.",
@@ -161,3 +180,18 @@ def metrics() -> MetricsResponse:
     return MetricsResponse(
         metrics=get_last_query_metrics(),
     )
+
+
+@app.get(
+    "/metrics/prometheus",
+    include_in_schema=False,
+)
+def prometheus_metrics() -> Response:
+    return Response(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST,
+    )
+
+
+for route in app.routes:
+    print(route.path)

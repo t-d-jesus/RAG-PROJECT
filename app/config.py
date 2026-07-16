@@ -98,3 +98,18 @@ OPENSEARCH_HYBRID_PIPELINE = os.getenv(
     "OPENSEARCH_HYBRID_PIPELINE",
     "rag-hybrid-pipeline",
 )
+
+
+OPENAI_INPUT_PRICE_PER_MILLION = float(
+    os.getenv(
+        "OPENAI_INPUT_PRICE_PER_MILLION",
+        "0",
+    )
+)
+
+OPENAI_OUTPUT_PRICE_PER_MILLION = float(
+    os.getenv(
+        "OPENAI_OUTPUT_PRICE_PER_MILLION",
+        "0",
+    )
+)
