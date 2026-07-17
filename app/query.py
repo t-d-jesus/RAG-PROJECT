@@ -1,18 +1,19 @@
 import time
+import unicodedata
 
 from openai import OpenAI
 
 from app.confidence import calculate_confidence
 from app.config import (
     CHAT_MODEL,
-    OPENAI_INPUT_PRICE_PER_MILLION,
-    OPENAI_OUTPUT_PRICE_PER_MILLION,
     ENABLE_DISTANCE_FILTER,
     MAX_CONTEXT_CHARS,
     MAX_CONTEXT_CHUNKS,
     MAX_DISTANCE,
     MAX_HISTORY_MESSAGES,
     OPENAI_API_KEY,
+    OPENAI_INPUT_PRICE_PER_MILLION,
+    OPENAI_OUTPUT_PRICE_PER_MILLION,
     RERANK_TOP_K,
     RETRIEVAL_RESULTS,
     VECTOR_STORE,
@@ -33,16 +34,55 @@ from app.vectorstore.store import (
 client = OpenAI(api_key=OPENAI_API_KEY)
 
 
+def normalize_text(text: str) -> str:
+    normalized = unicodedata.normalize(
+        "NFKD",
+        text,
+    )
+
+    without_accents = "".join(
+        character for character in normalized if not unicodedata.combining(character)
+    )
+
+    return without_accents.lower()
+
+
+def is_negative_answer(answer: str) -> bool:
+    normalized_answer = normalize_text(answer)
+
+    return "nao encontrei essa informacao" in normalized_answer
+
+
 def get_collections_from_filter(
     metadata_filter: dict | None,
 ) -> list[str]:
     if not metadata_filter:
-        return ["documents", "images"]
+        return [
+            "documents",
+            "images",
+        ]
 
     if metadata_filter.get("document_type") == "image":
         return ["images"]
 
     return ["documents"]
+
+
+def calculate_usage_cost(
+    input_tokens: int,
+    output_tokens: int,
+) -> tuple[float, float, float]:
+    input_cost_usd = input_tokens / 1_000_000 * OPENAI_INPUT_PRICE_PER_MILLION
+
+    output_cost_usd = output_tokens / 1_000_000 * OPENAI_OUTPUT_PRICE_PER_MILLION
+
+    estimated_cost_usd = input_cost_usd + output_cost_usd
+
+    return (
+        input_cost_usd,
+        output_cost_usd,
+        estimated_cost_usd,
+    )
 
 
 def ask(
@@ -67,7 +107,9 @@ def ask(
     total_start = time.perf_counter()
 
     if metadata_filter is None:
-        metadata_filter = detect_metadata_filter(question)
+        metadata_filter = detect_metadata_filter(
+            question,
+        )
 
     with timer(
         pipeline_metrics,
@@ -144,15 +186,8 @@ def ask(
     )
 
     if native_hybrid_search:
-        # O OpenSearch já executou:
-        # - BM25
-        # - busca vetorial
-        # - normalização
-        # - fusão dos scores
-        #
-        # As distâncias retornadas neste modo são derivadas do
-        # score híbrido, e não representam distância vetorial pura.
         candidates = all_candidates
+
         pipeline_metrics["hybrid_ranking_time"] = 0.0
     else:
         if ENABLE_DISTANCE_FILTER:
@@ -193,20 +228,27 @@ def ask(
         confidence = {
             "level": "low",
             "score": 0.0,
-            "reason": "Nenhum candidato encontrado.",
+            "reason": ("Nenhum candidato encontrado."),
         }
 
         pipeline_metrics["reranked_chunks"] = 0
         pipeline_metrics["expanded_chunks"] = 0
         pipeline_metrics["context_chunks"] = 0
         pipeline_metrics["context_chars"] = 0
+        pipeline_metrics["input_tokens"] = 0
+        pipeline_metrics["output_tokens"] = 0
+        pipeline_metrics["total_tokens"] = 0
+        pipeline_metrics["input_cost_usd"] = 0.0
+        pipeline_metrics["output_cost_usd"] = 0.0
+        pipeline_metrics["estimated_cost_usd"] = 0.0
+        pipeline_metrics["image_fallback_used"] = False
         pipeline_metrics["total_time"] = round(
             time.perf_counter() - total_start,
             6,
         )
 
         return (
-            "Não encontrei essa informação nos documentos.",
+            ("Não encontrei essa informação nos documentos."),
             [],
             [],
             rewritten_question,
@@ -266,6 +308,10 @@ def ask(
         context,
     )
 
+    has_image_context = any(
+        metadata.get("document_type") == "image" for _, metadata, _ in selected_chunks
+    )
+
     with timer(
         pipeline_metrics,
         "llm_time",
@@ -278,13 +324,21 @@ Você é um assistente de RAG.
 Regras:
 - Responda apenas usando o contexto fornecido.
 - Não invente informações.
-- Se a resposta não estiver no contexto, diga:
+- Verifique todo o contexto antes de concluir que a
+  informação não foi encontrada.
+- Se a resposta realmente não estiver no contexto,
+  responda exatamente:
   "Não encontrei essa informação nos documentos."
-- Quando a pergunta solicitar texto, título ou pergunta visível em uma imagem,
-  copie exatamente o trecho presente no contexto.
-- Não traduza, não parafraseie e não altere capitalização,
-  pontuação ou idioma desse trecho.
-- Sempre cite as referências utilizadas.
+- Ao usar a resposta negativa acima, não adicione
+  citações, explicações ou qualquer outro texto.
+- Quando a pergunta solicitar texto, título ou pergunta
+  visível em uma imagem, copie exatamente o trecho
+  correspondente presente no contexto.
+- Para textos extraídos de imagens, não traduza,
+  não parafraseie e não altere capitalização,
+  pontuação ou idioma.
+- Nas respostas baseadas no contexto, cite as
+  referências utilizadas.
 - Use o formato [1], [2], [3].
 
 Contexto:
@@ -297,17 +351,58 @@ Pergunta:
 """,
         )
 
-    usage = response.usage
+        answer = response.output_text
 
-    input_tokens = usage.input_tokens
-    output_tokens = usage.output_tokens
-    total_tokens = usage.total_tokens
+        input_tokens = response.usage.input_tokens
+        output_tokens = response.usage.output_tokens
 
-    input_cost_usd = input_tokens / 1_000_000 * OPENAI_INPUT_PRICE_PER_MILLION
+        image_fallback_used = has_image_context and is_negative_answer(answer)
 
-    output_cost_usd = output_tokens / 1_000_000 * OPENAI_OUTPUT_PRICE_PER_MILLION
+        if image_fallback_used:
+            fallback_response = client.responses.create(
+                model=CHAT_MODEL,
+                input=f"""
+Extraia a resposta diretamente do contexto.
 
-    estimated_cost_usd = input_cost_usd + output_cost_usd
+Regras obrigatórias:
+- O contexto contém conteúdo extraído de uma imagem.
+- Examine todo o contexto antes de responder.
+- Identifique o texto que responde à pergunta.
+- Copie esse texto exatamente como aparece.
+- Não traduza.
+- Não parafraseie.
+- Preserve idioma, capitalização e pontuação.
+- Não responda que a informação não foi encontrada
+  se houver no contexto um trecho relacionado à
+  pergunta.
+- Inclua a referência utilizada no formato [1],
+  [2] ou [3].
+
+Contexto:
+
+{context}
+
+Pergunta:
+
+{rewritten_question}
+""",
+            )
+
+            answer = fallback_response.output_text
+
+            input_tokens += fallback_response.usage.input_tokens
+            output_tokens += fallback_response.usage.output_tokens
+
+    total_tokens = input_tokens + output_tokens
+
+    (
+        input_cost_usd,
+        output_cost_usd,
+        estimated_cost_usd,
+    ) = calculate_usage_cost(
+        input_tokens=input_tokens,
+        output_tokens=output_tokens,
+    )
 
     pipeline_metrics["input_tokens"] = input_tokens
     pipeline_metrics["output_tokens"] = output_tokens
@@ -324,6 +419,8 @@ Pergunta:
         estimated_cost_usd,
         8,
     )
+    pipeline_metrics["image_fallback_used"] = image_fallback_used
+
     sources = [
         {
             "source": metadata["source"],
@@ -353,7 +450,7 @@ Pergunta:
     )
 
     return (
-        response.output_text,
+        answer,
         sources,
         selected_distances,
         rewritten_question,
@@ -413,6 +510,7 @@ if __name__ == "__main__":
             print(f"- {source}")
 
         print("\nChunks usados:")
+
         if not sources:
             print("- nenhum chunk relevante encontrado")
         else:
@@ -431,6 +529,7 @@ if __name__ == "__main__":
                 )
 
         print("\nReferências:")
+
         for citation in citations:
             print(
                 f"{citation['reference']} "
@@ -442,6 +541,7 @@ if __name__ == "__main__":
             )
 
         print("\nMétricas:")
+
         for key, value in pipeline_metrics.items():
             print(f"- {key}: {value}")
 

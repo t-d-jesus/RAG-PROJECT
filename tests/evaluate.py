@@ -4,7 +4,11 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 from app.query import ask
-from tests.metrics import contains_keywords, source_found, sources_from_dicts
+from tests.metrics import (
+    contains_keywords,
+    source_found,
+    sources_from_dicts,
+)
 from tests.test_cases import TEST_CASES
 
 

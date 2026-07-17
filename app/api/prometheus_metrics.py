@@ -1,8 +1,8 @@
 from typing import Any
 
 from prometheus_client import Counter, Gauge, Histogram
-from app.config import CHAT_MODEL
 
+from app.config import CHAT_MODEL
 
 QUERY_REQUESTS = Counter(
     "rag_query_requests_total",

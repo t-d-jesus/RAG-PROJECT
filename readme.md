@@ -538,6 +538,20 @@ Triggered on:
 
 ![Grafana Dashboard](images/image.png)
 
+The project includes a pre-configured Grafana dashboard:
+
+```txt
+grafana/dashboards/rag-observability.json
+```
+
+Import it into Grafana to visualize:
+
+- Query Metrics
+- Retrieval Metrics
+- Confidence Metrics
+- Token Usage
+- Cost Tracking
+
 ---
 
 # Project Structure
