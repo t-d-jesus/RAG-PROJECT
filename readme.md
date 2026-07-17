@@ -554,6 +554,51 @@ Import it into Grafana to visualize:
 
 ---
 
+## Benchmark Framework
+
+The project includes an automated benchmark framework for comparing:
+
+- ChromaDB
+- Qdrant
+- PostgreSQL + pgvector
+- OpenSearch
+
+The benchmark measures:
+
+- Retrieval quality
+- Reranking quality
+- Answer quality
+- End-to-end latency
+- Retrieval latency
+- Token usage
+- Estimated API cost
+- Image fallback usage
+
+Run a single benchmark round:
+
+```bash
+python -m benchmarks.run
+```
+
+Run multiple rounds:
+
+```bash
+python -m benchmarks.run --runs 3
+```
+
+Generated reports:
+
+- JSON
+- Raw CSV
+- Aggregated CSV
+- Markdown
+
+Reference benchmark:
+
+```txt
+benchmarks/results/reference/benchmark_reference.md
+```
+
 # Project Structure
 
 ```txt

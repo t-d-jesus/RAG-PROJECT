@@ -85,6 +85,27 @@ def calculate_usage_cost(
     )
 
 
+def requires_literal_image_transcription(
+    question: str,
+) -> bool:
+    normalized_question = normalize_text(question)
+
+    literal_markers = (
+        "o que perguntaram",
+        "qual pergunta",
+        "qual texto",
+        "qual titulo",
+        "qual frase",
+        "texto visivel",
+        "escrito na imagem",
+        "aparece na imagem",
+        "transcreva",
+        "copie",
+    )
+
+    return any(marker in normalized_question for marker in literal_markers)
+
+
 def ask(
     question: str,
     history: list[dict],
@@ -312,36 +333,64 @@ def ask(
         metadata.get("document_type") == "image" for _, metadata, _ in selected_chunks
     )
 
+    literal_image_transcription = (
+        has_image_context
+        and requires_literal_image_transcription(
+            rewritten_question,
+        )
+    )
+
     with timer(
         pipeline_metrics,
         "llm_time",
     ):
-        response = client.responses.create(
-            model=CHAT_MODEL,
-            input=f"""
-Você é um assistente de RAG.
+        if literal_image_transcription:
+            response = client.responses.create(
+                model=CHAT_MODEL,
+                input=f"""
+    Extraia a resposta diretamente do contexto fornecido.
 
-Regras:
-- Responda apenas usando o contexto fornecido.
-- Não invente informações.
-- Verifique todo o contexto antes de concluir que a
-  informação não foi encontrada.
-- Se a resposta realmente não estiver no contexto,
-  responda exatamente:
-  "Não encontrei essa informação nos documentos."
-- Ao usar a resposta negativa acima, não adicione
-  citações, explicações ou qualquer outro texto.
-- Quando a pergunta solicitar texto, título ou pergunta
-  visível em uma imagem, copie exatamente o trecho
-  correspondente presente no contexto.
-- Para textos extraídos de imagens, não traduza,
-  não parafraseie e não altere capitalização,
-  pontuação ou idioma.
-- Nas respostas baseadas no contexto, cite as
-  referências utilizadas.
-- Use o formato [1], [2], [3].
+    Regras obrigatórias:
+    - A pergunta solicita um texto visível em uma imagem.
+    - Localize no contexto o trecho que responde à pergunta.
+    - Copie o trecho exatamente como aparece.
+    - Não traduza.
+    - Não parafraseie.
+    - Não adapte o texto para o idioma da pergunta.
+    - Preserve idioma, capitalização e pontuação.
+    - Inclua a referência utilizada no formato [1], [2] ou [3].
+    - Retorne somente o trecho encontrado e sua referência.
 
-Contexto:
+    Contexto:
+
+    {context}
+
+    Pergunta:
+
+    {rewritten_question}
+    """,
+            )
+        else:
+            response = client.responses.create(
+                model=CHAT_MODEL,
+                input=f"""
+    Você é um assistente de RAG.
+
+    Regras:
+    - Responda apenas usando o contexto fornecido.
+    - Não invente informações.
+    - Verifique todo o contexto antes de concluir que a
+    informação não foi encontrada.
+    - Se a resposta realmente não estiver no contexto,
+    responda exatamente:
+    "Não encontrei essa informação nos documentos."
+    - Ao usar a resposta negativa acima, não adicione
+    citações, explicações ou qualquer outro texto.
+    - Nas respostas baseadas no contexto, cite as
+    referências utilizadas.
+    - Use o formato [1], [2], [3].
+
+    Contexto:
 
 {context}
 
@@ -349,7 +398,7 @@ Pergunta:
 
 {rewritten_question}
 """,
-        )
+            )
 
         answer = response.output_text
 
@@ -448,6 +497,8 @@ Pergunta:
         time.perf_counter() - total_start,
         6,
     )
+
+    pipeline_metrics["literal_image_transcription"] = literal_image_transcription
 
     return (
         answer,

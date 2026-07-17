@@ -12,7 +12,7 @@ from tests.metrics import (
 from tests.test_cases import TEST_CASES
 
 
-def evaluate() -> None:
+def evaluate() -> dict:
     results = []
     category_stats = defaultdict(
         lambda: {
@@ -162,16 +162,30 @@ def evaluate() -> None:
         "total": total,
         "overall_passed": overall_passed_total,
         "score": overall_passed_total / total,
+        "retrieval_score": (retrieval_passed_total / total),
+        "rerank_score": (rerank_passed_total / total),
+        "answer_score": (answer_passed_total / total),
         "category_stats": dict(category_stats),
         "results": results,
     }
 
     output_path = results_dir / f"evaluation_{timestamp}.json"
 
-    with open(output_path, "w", encoding="utf-8") as file:
-        json.dump(output, file, ensure_ascii=False, indent=2)
+    with open(
+        output_path,
+        "w",
+        encoding="utf-8",
+    ) as file:
+        json.dump(
+            output,
+            file,
+            ensure_ascii=False,
+            indent=2,
+        )
 
     print(f"\nResultado salvo em: {output_path}")
+
+    return output
 
 
 if __name__ == "__main__":

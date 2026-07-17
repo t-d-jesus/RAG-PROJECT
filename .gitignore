@@ -87,3 +87,7 @@ credentials/
 # =========================
 qdrant_data
 
+
+benchmarks/results/*
+!benchmarks/results/reference/
+!benchmarks/results/reference/**
