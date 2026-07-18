@@ -14,3 +14,7 @@ fastapi
 uvicorn[standard]
 opensearch-py
 prometheus-client
+streamlit
+pandas
+matplotlib
+requests

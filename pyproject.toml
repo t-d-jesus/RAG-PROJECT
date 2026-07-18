@@ -12,3 +12,11 @@ select = [
     "F",
     "I",
 ]
+
+[project]
+dependencies = [
+    "streamlit",
+    "pandas",
+    "matplotlib",
+    "requests",
+]
