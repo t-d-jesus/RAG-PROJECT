@@ -65,3 +65,15 @@ class ResetResponse(BaseModel):
 
 class MetricsResponse(BaseModel):
     metrics: dict[str, Any]
+
+
+class BenchmarkHistoryResponse(BaseModel):
+    benchmarks: list[dict[str, Any]]
+
+
+class BenchmarkLatestResponse(BaseModel):
+    benchmark: dict[str, Any] | None
+
+
+class BenchmarkDashboardResponse(BaseModel):
+    data: dict[str, list[dict[str, Any]]]

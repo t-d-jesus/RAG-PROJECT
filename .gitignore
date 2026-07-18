@@ -91,3 +91,7 @@ qdrant_data
 benchmarks/results/*
 !benchmarks/results/reference/
 !benchmarks/results/reference/**
+
+
+benchmarks/history/*.json
+!benchmarks/history/.gitkeep

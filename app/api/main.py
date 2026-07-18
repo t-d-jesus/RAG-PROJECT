@@ -9,6 +9,9 @@ from app.api.prometheus_metrics import (
     observe_query_metrics,
 )
 from app.api.schemas import (
+    BenchmarkDashboardResponse,
+    BenchmarkHistoryResponse,
+    BenchmarkLatestResponse,
     HealthResponse,
     IngestResponse,
     MetricsResponse,
@@ -25,6 +28,11 @@ from app.config import DATA_PATH, VECTOR_STORE
 from app.ingest import ingest_file
 from app.query import ask
 from app.vectorstore.store import reset_all_collections
+from benchmarks.dashboard_data import load_dashboard_data
+from benchmarks.history import (
+    get_latest_benchmark,
+    load_benchmark_history,
+)
 
 app = FastAPI(
     title="RAG Platform API",
@@ -190,6 +198,36 @@ def prometheus_metrics() -> Response:
     return Response(
         content=generate_latest(),
         media_type=CONTENT_TYPE_LATEST,
+    )
+
+
+@app.get(
+    "/benchmarks/history",
+    response_model=BenchmarkHistoryResponse,
+)
+def benchmark_history() -> BenchmarkHistoryResponse:
+    return BenchmarkHistoryResponse(
+        benchmarks=load_benchmark_history(),
+    )
+
+
+@app.get(
+    "/benchmarks/latest",
+    response_model=BenchmarkLatestResponse,
+)
+def benchmark_latest() -> BenchmarkLatestResponse:
+    return BenchmarkLatestResponse(
+        benchmark=get_latest_benchmark(),
+    )
+
+
+@app.get(
+    "/benchmarks/dashboard",
+    response_model=BenchmarkDashboardResponse,
+)
+def benchmark_dashboard() -> BenchmarkDashboardResponse:
+    return BenchmarkDashboardResponse(
+        data=load_dashboard_data(),
     )
 
 

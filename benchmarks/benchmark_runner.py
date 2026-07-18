@@ -1,14 +1,44 @@
-from statistics import mean
+from statistics import mean, stdev
 from typing import Any
 
 from tests.evaluate import evaluate
 
 
-def safe_mean(values: list[float]) -> float:
+def safe_mean(
+    values: list[float],
+) -> float:
     if not values:
         return 0.0
 
     return mean(values)
+
+
+def safe_std(
+    values: list[float],
+) -> float:
+    if len(values) <= 1:
+        return 0.0
+
+    return stdev(values)
+
+
+def metric_summary(
+    values: list[float],
+) -> dict[str, float]:
+    if not values:
+        return {
+            "avg": 0.0,
+            "min": 0.0,
+            "max": 0.0,
+            "std": 0.0,
+        }
+
+    return {
+        "avg": mean(values),
+        "min": min(values),
+        "max": max(values),
+        "std": safe_std(values),
+    }
 
 
 def extract_metric(
@@ -19,9 +49,13 @@ def extract_metric(
 
     for result in results:
         metrics = result.get("metrics", {})
+
         value = metrics.get(metric_name)
 
-        if isinstance(value, int | float):
+        if isinstance(
+            value,
+            int | float,
+        ):
             values.append(float(value))
 
     return values
@@ -31,45 +65,58 @@ def run_benchmark(
     vector_store: str,
 ) -> dict[str, Any]:
     evaluation = evaluate()
+
     results = evaluation["results"]
 
     total_times = extract_metric(
         results,
         "total_time",
     )
+
     retrieval_times = extract_metric(
         results,
         "retrieval_time",
     )
+
     rerank_times = extract_metric(
         results,
         "rerank_time",
     )
+
     llm_times = extract_metric(
         results,
         "llm_time",
     )
+
     input_tokens = extract_metric(
         results,
         "input_tokens",
     )
+
     output_tokens = extract_metric(
         results,
         "output_tokens",
     )
+
     total_tokens = extract_metric(
         results,
         "total_tokens",
     )
+
     costs = extract_metric(
         results,
         "estimated_cost_usd",
     )
 
+    retrieval_summary = metric_summary(retrieval_times)
+
     image_fallback_count = sum(
         1
         for result in results
-        if result.get("metrics", {}).get(
+        if result.get(
+            "metrics",
+            {},
+        ).get(
             "image_fallback_used",
             False,
         )
@@ -85,23 +132,16 @@ def run_benchmark(
         "rerank_score": evaluation["rerank_score"],
         "answer_score": evaluation["answer_score"],
         "avg_total_time": safe_mean(total_times),
-        "avg_retrieval_time": safe_mean(
-            retrieval_times,
-        ),
-        "avg_rerank_time": safe_mean(
-            rerank_times,
-        ),
-        "avg_llm_time": safe_mean(llm_times),
-        "avg_input_tokens": safe_mean(
-            input_tokens,
-        ),
-        "avg_output_tokens": safe_mean(
-            output_tokens,
-        ),
-        "avg_total_tokens": safe_mean(
-            total_tokens,
-        ),
-        "avg_cost_usd": safe_mean(costs),
+        "avg_retrieval_time": (retrieval_summary["avg"]),
+        "min_retrieval_time": (retrieval_summary["min"]),
+        "max_retrieval_time": (retrieval_summary["max"]),
+        "std_retrieval_time": (retrieval_summary["std"]),
+        "avg_rerank_time": (safe_mean(rerank_times)),
+        "avg_llm_time": (safe_mean(llm_times)),
+        "avg_input_tokens": (safe_mean(input_tokens)),
+        "avg_output_tokens": (safe_mean(output_tokens)),
+        "avg_total_tokens": (safe_mean(total_tokens)),
+        "avg_cost_usd": (safe_mean(costs)),
         "total_cost_usd": sum(costs),
-        "image_fallback_count": image_fallback_count,
+        "image_fallback_count": (image_fallback_count),
     }
