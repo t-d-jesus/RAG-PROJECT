@@ -1,3 +1,56 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "rag-project"
+version = "1.6.0"
+requires-python = ">=3.13"
+
+dependencies = [
+    "chromadb",
+    "fastapi",
+    "matplotlib",
+    "openai",
+    "opensearch-py",
+    "pandas",
+    "pgvector",
+    "pillow",
+    "prometheus-client",
+    "psycopg[binary]",
+    "pypdf",
+    "python-docx",
+    "python-dotenv",
+    "qdrant-client>=1.15,<1.17",
+    "rank-bm25",
+    "requests",
+    "streamlit",
+    "uvicorn[standard]",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+]
+
+[tool.setuptools.packages.find]
+where = ["."]
+include = [
+    "app*",
+    "benchmarks*",
+    "dashboard*",
+]
+exclude = [
+    "data*",
+    "chroma*",
+    "images*",
+    "grafana*",
+    "qdrant_data*",
+    "tests*",
+]
+namespaces = false
+
 [tool.ruff]
 line-length = 88
 target-version = "py313"
@@ -11,12 +64,4 @@ select = [
     "E",
     "F",
     "I",
-]
-
-[project]
-dependencies = [
-    "streamlit",
-    "pandas",
-    "matplotlib",
-    "requests",
 ]

@@ -161,7 +161,7 @@ source .venv/bin/activate
 Install dependencies:
 
 ```bash
-pip install -r requirements.txt
+pip install -e ".[dev]"
 ```
 
 ---
@@ -632,7 +632,6 @@ rag-project/
 ├── qdrant_data/
 ├── Dockerfile
 ├── docker-compose.yml
-├── requirements.txt
 ├── pyproject.toml
 ├── LICENSE
 └── README.md
